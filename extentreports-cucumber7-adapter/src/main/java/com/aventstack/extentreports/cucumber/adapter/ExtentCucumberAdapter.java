@@ -24,6 +24,7 @@ import com.aventstack.extentreports.MediaEntityBuilder;
 import com.aventstack.extentreports.Status;
 import com.aventstack.extentreports.gherkin.model.Asterisk;
 import com.aventstack.extentreports.gherkin.model.ScenarioOutline;
+import com.aventstack.extentreports.markuputils.Markup;
 import com.aventstack.extentreports.markuputils.MarkupHelper;
 import com.aventstack.extentreports.model.Test;
 import com.aventstack.extentreports.service.ExtentService;
@@ -164,7 +165,6 @@ public class ExtentCucumberAdapter implements ConcurrentEventListener {
 
 	private synchronized void handleTestStepStarted(TestStepStarted event) {
 		isHookThreadLocal.set(false);
-
 		if (event.getTestStep() instanceof HookTestStep) {
 			ExtentTest t = scenarioThreadLocal.get().createNode(Asterisk.class, event.getTestStep().getCodeLocation(),
 					(((HookTestStep) event.getTestStep()).getHookType()).toString().toUpperCase());
@@ -176,12 +176,17 @@ public class ExtentCucumberAdapter implements ConcurrentEventListener {
 			PickleStepTestStep testStep = (PickleStepTestStep) event.getTestStep();
 			createTestStep(testStep);
 		}
+		flushReport();
 	}
 
 	private synchronized void handleTestStepFinished(TestStepFinished event) {
 		updateResult(event.getResult());
+		flushReport();
 	}
 
+//	private synchronized void updateInProgressResult() {
+//		stepTestThreadLocal.get().info(result.getError());
+//	}
 	private synchronized void updateResult(Result result) {
 		Test test = stepTestThreadLocal.get().getModel();
 		switch (result.getStatus().name().toLowerCase()) {
@@ -300,6 +305,10 @@ public class ExtentCucumberAdapter implements ConcurrentEventListener {
 		ExtentService.getInstance().flush();
 	}
 
+	private void flushReport() {
+		ExtentService.getInstance().flush();
+	}
+
 	private synchronized void handleStartOfFeature(TestCase testCase) {
 		if (currentFeatureFile == null || !currentFeatureFile.equals(testCase.getUri())) {
 			currentFeatureFile.set(testCase.getUri());
@@ -329,7 +338,6 @@ public class ExtentCucumberAdapter implements ConcurrentEventListener {
 					feature.getDescription());
 			featureTestThreadLocal.set(t);
 			featureMap.put(feature.getName(), t);
-
 			Set<String> tagList = feature.getTags().stream().map(tag -> tag.getName()).collect(Collectors.toSet());
 			featureTagsThreadLocal.set(tagList);
 		}
@@ -425,16 +433,20 @@ public class ExtentCucumberAdapter implements ConcurrentEventListener {
 					testCase.getName(), scenarioDefinition.getDescription());
 			scenarioThreadLocal.set(t);
 		}
+		System.out.println("######## Tags: " + testCase.getTags());
 		if (!testCase.getTags().isEmpty()) {
-			testCase.getTags().forEach(x -> scenarioThreadLocal.get().assignCategory(x));
+			System.out.println("######## Setting Tags to scenarioThread: " + testCase.getTags());
+			testCase.getTags().forEach(x -> scenarioThreadLocal.get().assignCategory(x.substring(1)));
 		}
 		if (featureTagsThreadLocal.get() != null) {
-			featureTagsThreadLocal.get().forEach(x -> scenarioThreadLocal.get().assignCategory(x));
+			System.out.println("######## Setting Tags to featureTagsThreadLocal: " + testCase.getTags());
+			featureTagsThreadLocal.get().forEach(x -> scenarioThreadLocal.get().assignCategory(x.substring(1)));
 		}
 
 		Test parent = scenarioThreadLocal.get().getModel().getParent();
 		if (parent.getBddType() == ScenarioOutline.class && scenarioOutlineTagsThreadLocal.get() != null) {
-			scenarioOutlineTagsThreadLocal.get().forEach(x -> scenarioThreadLocal.get().assignCategory(x));
+			System.out.println("######## Setting Tags to scenarioOutlineTagsThreadLocal: " + testCase.getTags());
+			scenarioOutlineTagsThreadLocal.get().forEach(x -> scenarioThreadLocal.get().assignCategory(x.substring(1)));
 		}
 	}
 
@@ -484,6 +496,13 @@ public class ExtentCucumberAdapter implements ConcurrentEventListener {
 	// https://github.com/extent-framework/extentreports-cucumber4-adapter/pull/33
 	public static synchronized void addTestStepLog(String message) {
 		stepTestThreadLocal.get().info(message);
+		stepTestThreadLocal.get().getExtent().flush();
+	}
+
+	//Custom added to support Markup. Use MarkupHelper.
+	public static synchronized void addTestStepLog(Markup markupMessage) {
+		stepTestThreadLocal.get().info(markupMessage);
+		stepTestThreadLocal.get().getExtent().flush();
 	}
 
 	public static synchronized void addTestStepScreenCaptureFromPath(String imagePath) throws IOException {

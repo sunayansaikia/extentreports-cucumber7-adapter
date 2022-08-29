@@ -290,6 +290,14 @@ public class ExtentService implements Serializable {
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
+			((ExtentSparkReporter) r).config().setCss(".test-status { color: #2bdd87 !important; }" +
+					".pass-bg { background-color: #437805 }" +
+					".badge.log { color: #f0f5f0 }"+
+					".badge-success { background-color: #118385 }" +
+					".badge-danger { background-color: #cf415c }" +
+					".badge-primary { background-color: #565ae3 }" +
+					".fail-bg { background-color: #ab5353 }" +
+					".info-bg { background-color: #1373a7}");
 			INSTANCE.attachReporter((ExtentObserver<?>) r);
 		}
 
